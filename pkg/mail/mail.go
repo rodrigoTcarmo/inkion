@@ -30,7 +30,7 @@ type Attachment struct {
 	Size        int
 }
 
-func (m Mail) FetchEmails() ([]Email, error){
+func (m Mail) FetchEmails() ([]Email, error) {
 	m.Auth()
 	// Select INBOX
 	mbox, err := m.client.Select("INBOX", nil).Wait()
@@ -77,7 +77,10 @@ func (m Mail) FetchEmails() ([]Email, error){
 		}
 
 		parsedEmail := parseEmail(msg)
-		emails = append(emails, parsedEmail)
+		if m.expectedSender(parsedEmail) {
+			emails = append(emails, parsedEmail)
+		}
+		slog.Warn("skipped email: not expected sender", "sender", parsedEmail.From)
 	}
 
 	if err := fetchCmd.Close(); err != nil {
@@ -111,6 +114,10 @@ func (m Mail) GetEmails() {
 		// Show body preview (first 200 chars)
 		fmt.Printf("Body preview:\n%s\n", e.Body)
 	}
+}
+
+func (m Mail) expectedSender(email Email) bool {
+	return strings.Contains(email.From, m.config.ExpectedSender)
 }
 
 func parseEmail(msg *imapclient.FetchMessageData) Email {
