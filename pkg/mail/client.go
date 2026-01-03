@@ -12,6 +12,11 @@ type Client interface {
 	FetchEmails()
 }
 
+type Mail struct {
+	client *imapclient.Client
+	config *config.InkionConfig
+}
+
 func NewClient() *Mail {
 	imapServer := os.Getenv("INKION_IMAP_SERVER")
 

@@ -30,10 +30,6 @@ type Attachment struct {
 	Size        int
 }
 
-type Mail struct {
-	client *imapclient.Client
-}
-
 func (m Mail) FetchEmails() ([]Email, error){
 	// Select INBOX
 	mbox, err := m.client.Select("INBOX", nil).Wait()
