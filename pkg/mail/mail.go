@@ -33,7 +33,7 @@ type Attachment struct {
 
 func GetEmails() {
 	// Gmail IMAP settings
-	imapServer := "imap.gmail.com:993"
+	imapServer := os.Getenv("INKION_IMAP_SERVER")
 	email := os.Getenv("INKION_EMAIL_ADDRS")
 	appPassword := os.Getenv("INKION_EMAIL_PWD")
 
