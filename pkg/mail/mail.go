@@ -3,7 +3,7 @@ package mail
 import (
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -38,15 +38,17 @@ func GetEmails() {
 	appPassword := os.Getenv("INKION_EMAIL_PWD")
 
 	if appPassword == "" || email == "" {
-		log.Fatal("INKION_EMAIL_PWD or INKION_EMAIL_ADDRS environment variable not set")
+		slog.Error("INKION_EMAIL_PWD or INKION_EMAIL_ADDRS environment variable not set")
+		return
 	}
 
-	fmt.Printf("Connecting to %s...\n", imapServer)
+	slog.Info("Connecting to imap server", "IMAP Server", imapServer)
 
 	// Connect to Gmail IMAP server
 	client, err := imapclient.DialTLS(imapServer, nil)
 	if err != nil {
-		log.Fatalf("Failed to connect: %v", err)
+		slog.Error("failed to connect", "error", err)
+		return
 	}
 	defer client.Close()
 
@@ -54,7 +56,8 @@ func GetEmails() {
 
 	// Login with email and app password
 	if err := client.Login(email, appPassword).Wait(); err != nil {
-		log.Fatalf("Login failed: %v", err)
+		slog.Error("Login failed", "error", err)
+		return
 	}
 
 	fmt.Println("Login successful!")
@@ -62,7 +65,8 @@ func GetEmails() {
 	// Select INBOX
 	mbox, err := client.Select("INBOX", nil).Wait()
 	if err != nil {
-		log.Fatalf("Failed to select INBOX: %v", err)
+		slog.Error("Failed to select INBOX", "error", err)
+		return
 	}
 
 	fmt.Printf("\nINBOX has %d messages\n", mbox.NumMessages)
@@ -74,7 +78,7 @@ func GetEmails() {
 	}
 
 	if numToFetch == 0 {
-		fmt.Println("No emails to fetch")
+		slog.Info("No emails to fetch")
 		return
 	}
 
@@ -89,7 +93,7 @@ func GetEmails() {
 		BodySection: []*imap.FetchItemBodySection{{}}, // Fetch full body
 	}
 
-	fmt.Printf("\nFetching last %d emails...\n", numToFetch)
+	slog.Info("Fetching emails...", "emails quantity", numToFetch)
 
 	fetchCmd := client.Fetch(seqSet, fetchOptions)
 	defer fetchCmd.Close()
@@ -107,7 +111,7 @@ func GetEmails() {
 	}
 
 	if err := fetchCmd.Close(); err != nil {
-		log.Fatalf("Fetch failed: %v", err)
+		slog.Error("Fetch failed", "error", err)
 	}
 
 	// Display the emails
