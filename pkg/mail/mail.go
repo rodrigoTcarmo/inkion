@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/emersion/go-imap/v2"
@@ -31,45 +30,19 @@ type Attachment struct {
 	Size        int
 }
 
-func GetEmails() {
-	// Gmail IMAP settings
-	imapServer := os.Getenv("INKION_IMAP_SERVER")
-	email := os.Getenv("INKION_EMAIL_ADDRS")
-	appPassword := os.Getenv("INKION_EMAIL_PWD")
+type Mail struct {
+	client *imapclient.Client
+}
 
-	if appPassword == "" || email == "" {
-		slog.Error("INKION_EMAIL_PWD or INKION_EMAIL_ADDRS environment variable not set")
-		return
-	}
-
-	slog.Info("Connecting to imap server", "IMAP Server", imapServer)
-
-	// Connect to Gmail IMAP server
-	client, err := imapclient.DialTLS(imapServer, nil)
-	if err != nil {
-		slog.Error("failed to connect", "error", err)
-		return
-	}
-	defer client.Close()
-
-	fmt.Println("Connected! Logging in...")
-
-	// Login with email and app password
-	if err := client.Login(email, appPassword).Wait(); err != nil {
-		slog.Error("Login failed", "error", err)
-		return
-	}
-
-	fmt.Println("Login successful!")
-
+func (m Mail) FetchEmails() ([]Email, error){
 	// Select INBOX
-	mbox, err := client.Select("INBOX", nil).Wait()
+	mbox, err := m.client.Select("INBOX", nil).Wait()
 	if err != nil {
 		slog.Error("Failed to select INBOX", "error", err)
-		return
+		return nil, err
 	}
 
-	fmt.Printf("\nINBOX has %d messages\n", mbox.NumMessages)
+	slog.Info("INBOX has messages", "messages quantity", mbox.NumMessages)
 
 	// Fetch the last 5 emails (or fewer if inbox has less)
 	numToFetch := uint32(5)
@@ -78,8 +51,8 @@ func GetEmails() {
 	}
 
 	if numToFetch == 0 {
-		slog.Info("No emails to fetch")
-		return
+		slog.Error("No emails to fetch")
+		return nil, fmt.Errorf("no emails to fetch")
 	}
 
 	// Create sequence set for the last N messages
@@ -95,7 +68,7 @@ func GetEmails() {
 
 	slog.Info("Fetching emails...", "emails quantity", numToFetch)
 
-	fetchCmd := client.Fetch(seqSet, fetchOptions)
+	fetchCmd := m.client.Fetch(seqSet, fetchOptions)
 	defer fetchCmd.Close()
 
 	emails := []Email{}
@@ -112,12 +85,18 @@ func GetEmails() {
 
 	if err := fetchCmd.Close(); err != nil {
 		slog.Error("Fetch failed", "error", err)
+		return nil, fmt.Errorf("fetch failed: %v", err)
 	}
 
-	// Display the emails
-	fmt.Printf("\n========================================\n")
-	fmt.Printf("       FETCHED %d EMAILS\n", len(emails))
-	fmt.Printf("========================================\n")
+	return emails, nil
+}
+
+func (m Mail) GetEmails() (){
+	m.Auth()
+	emails, err := m.FetchEmails()
+	if err != nil {
+		slog.Error("error fetch emails", "error", err)
+	}
 
 	for i, e := range emails {
 		fmt.Printf("\n--- Email %d ---\n", i+1)
